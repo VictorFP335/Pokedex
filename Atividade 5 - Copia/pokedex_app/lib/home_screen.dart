@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'pokemon.dart';
 import 'pokemon_screen.dart';
 
@@ -10,43 +12,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final pokemons = [
-    Pokemon(
-      name: 'Gengar',
-      spriteId: 94,
-      typeIds: [8, 4],
-      level: 42,
-      moves: ['Hypnosis', 'Dream Eater', 'Shadow Ball', 'Lick'],
-    ),
-    Pokemon(
-      name: 'Charizard',
-      spriteId: 6,
-      typeIds: [10, 3],
-      level: 38,
-      moves: ['Flamethrower', 'Fly', 'Slash', 'Dragon Rage'],
-    ),
-    Pokemon(
-      name: 'Pikachu',
-      spriteId: 25,
-      typeIds: [13],
-      level: 25,
-      moves: ['Thunderbolt', 'Quick Attack', 'Iron Tail', 'Volt Tackle'],
-    ),
-    Pokemon(
-      name: 'Mewtwo',
-      spriteId: 150,
-      typeIds: [14],
-      level: 70,
-      moves: ['Psystrike', 'Shadow Ball', 'Aura Sphere', 'Ice Beam'],
-    ),
-    Pokemon(
-      name: 'Eevee',
-      spriteId: 133,
-      typeIds: [1],
-      level: 15,
-      moves: ['Tackle', 'Sand Attack', 'Quick Attack', 'Bite'],
-    ),
-  ];
+  final collection = FirebaseFirestore.instance.collection('pokemons');
 
   @override
   Widget build(BuildContext context) {
@@ -65,53 +31,96 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        itemCount: pokemons.length,
-        itemBuilder: (context, index) {
-          final pokemon = pokemons[index];
-          return Card(
-            elevation: 3,
-            margin: const EdgeInsets.symmetric(vertical: 6),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 8,
-              ),
-              leading: CircleAvatar(
-                radius: 30,
-                backgroundColor: Colors.grey[100],
-                backgroundImage: NetworkImage(pokemon.spriteUrl),
-              ),
-              title: Text(
-                pokemon.name,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
+      body: StreamBuilder<QuerySnapshot>(
+        stream: collection.snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(
+              child: Text('Nenhum Pokémon encontrado.'),
+            );
+          }
+
+          final docs = snapshot.data!.docs;
+
+          return ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final data = docs[index].data() as Map<String, dynamic>;
+              final docId = docs[index].id;
+
+              final name = data['name'] as String? ?? 'Unknown';
+              final spriteId = data['spriteId'] as int? ?? 0;
+              final level = data['level'] as int? ?? 1;
+              final types = List<String>.from(data['types'] ?? []);
+              final moves = List<String>.from(data['moves'] ?? []);
+
+              final pokemon = Pokemon(
+                name: name,
+                spriteId: spriteId,
+                typeIds: [], // não precisamos mais dos typeIds numéricos
+                level: level,
+                moves: moves,
+              );
+
+              return Card(
+                elevation: 3,
+                margin: const EdgeInsets.symmetric(vertical: 6),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ),
-              subtitle: Text(
-                'Nível ${pokemon.level}',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-              trailing: const Icon(Icons.chevron_right, color: Colors.red),
-              onTap: () async {
-                final novoNivel = await Navigator.push<int>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => PokemonScreen(pokemon: pokemon),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
                   ),
-                );
-                if (novoNivel != null) {
-                  setState(() {
-                    pokemon.level = novoNivel;
-                  });
-                }
-              },
-            ),
+                  leading: CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Colors.grey[100],
+                    backgroundImage: NetworkImage(pokemon.spriteUrl),
+                  ),
+                  title: Text(
+                    name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Nível $level',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Botão de deletar (Parte 3)
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () async {
+                          await collection.doc(docId).delete();
+                        },
+                      ),
+                      const Icon(Icons.chevron_right, color: Colors.red),
+                    ],
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PokemonScreen(
+                          pokemon: pokemon,
+                          docId: docId,
+                          types: types,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
           );
         },
       ),

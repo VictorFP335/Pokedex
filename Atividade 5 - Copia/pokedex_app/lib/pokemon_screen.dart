@@ -1,32 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'pokemon.dart';
 
-// Mapa de tipos: typeId -> {nome, cor}
-const typeInfo = {
-  1:  {'name': 'Normal',   'color': 0xFFA8A878},
-  2:  {'name': 'Fighting', 'color': 0xFFC03028},
-  3:  {'name': 'Flying',   'color': 0xFFA890F0},
-  4:  {'name': 'Poison',   'color': 0xFFA040A0},
-  5:  {'name': 'Ground',   'color': 0xFFE0C068},
-  6:  {'name': 'Rock',     'color': 0xFFB8A038},
-  7:  {'name': 'Bug',      'color': 0xFFA8B820},
-  8:  {'name': 'Ghost',    'color': 0xFF705898},
-  9:  {'name': 'Steel',    'color': 0xFFB8B8D0},
-  10: {'name': 'Fire',     'color': 0xFFF08030},
-  11: {'name': 'Water',    'color': 0xFF6890F0},
-  12: {'name': 'Grass',    'color': 0xFF78C850},
-  13: {'name': 'Electric', 'color': 0xFFF8D030},
-  14: {'name': 'Psychic',  'color': 0xFFF85888},
-  15: {'name': 'Ice',      'color': 0xFF98D8D8},
-  16: {'name': 'Dragon',   'color': 0xFF7038F8},
-  17: {'name': 'Dark',     'color': 0xFF705848},
-  18: {'name': 'Fairy',    'color': 0xFFEE99AC},
+// Mapa de tipos: nome -> cor (agora usando nomes como string)
+const typeColors = {
+  'Normal':   0xFFA8A878,
+  'Fighting': 0xFFC03028,
+  'Flying':   0xFFA890F0,
+  'Poison':   0xFFA040A0,
+  'Ground':   0xFFE0C068,
+  'Rock':     0xFFB8A038,
+  'Bug':      0xFFA8B820,
+  'Ghost':    0xFF705898,
+  'Steel':    0xFFB8B8D0,
+  'Fire':     0xFFF08030,
+  'Water':    0xFF6890F0,
+  'Grass':    0xFF78C850,
+  'Electric': 0xFFF8D030,
+  'Psychic':  0xFFF85888,
+  'Ice':      0xFF98D8D8,
+  'Dragon':   0xFF7038F8,
+  'Dark':     0xFF705848,
+  'Fairy':    0xFFEE99AC,
 };
 
 class PokemonScreen extends StatefulWidget {
   final Pokemon pokemon;
+  final String docId;
+  final List<String> types;
 
-  const PokemonScreen({super.key, required this.pokemon});
+  const PokemonScreen({
+    super.key,
+    required this.pokemon,
+    required this.docId,
+    required this.types,
+  });
 
   @override
   State<PokemonScreen> createState() => _PokemonScreenState();
@@ -78,8 +87,13 @@ class _PokemonScreenState extends State<PokemonScreen> {
     });
   }
 
-  void _endBattle() {
-    Navigator.pop(context, level);
+  // Parte 2: Atualizar nível no Firestore ao encerrar batalha
+  void _endBattle() async {
+    await FirebaseFirestore.instance
+        .collection('pokemons')
+        .doc(widget.docId)
+        .update({'level': level});
+    Navigator.pop(context);
   }
 
   Color get _hpColor {
@@ -120,18 +134,17 @@ class _PokemonScreenState extends State<PokemonScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Tipos
+              // Tipos (agora usando nomes string do Firestore)
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: widget.pokemon.typeIds.map((id) {
-                  final info = typeInfo[id];
-                  final color = Color(info?['color'] as int? ?? 0xFF888888);
-                  final name = info?['name'] as String? ?? 'Unknown';
+                children: widget.types.map((typeName) {
+                  final colorValue = typeColors[typeName] ?? 0xFF888888;
+                  final color = Color(colorValue);
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Chip(
                       label: Text(
-                        name,
+                        typeName,
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -267,7 +280,7 @@ class _PokemonScreenState extends State<PokemonScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Botão Encerrar Batalha
+              // Botão Encerrar Batalha (Parte 2: atualiza Firestore)
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
