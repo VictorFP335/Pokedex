@@ -1,0 +1,10 @@
+{
+  "hosting": {
+    "public": "starter-atividade-12/build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
+}
